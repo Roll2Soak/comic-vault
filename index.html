@@ -72,7 +72,7 @@ footer{max-width:1100px;margin:auto;padding:0 16px 24px;color:var(--muted);font-
   <section id="view-add" class="view hidden">
     <div class="panel">
       <h2>Scan a barcode</h2>
-      <p class="note">Camera scanning requires this page to be opened over HTTPS (for example, a free static host) and permission to use the camera. Scan the main UPC, then scan or type the separate 5-digit supplemental code. For common US comic UPC add-ons, the first 3 digits suggest the issue number and the final 2 digits encode cover/printing information. Verify the suggested issue before saving.</p>
+      <p class="note">Camera scanning requires this page to be opened over HTTPS (for example, a free static host) and permission to use the camera. The scanner can capture both parts in one session: it routes a 12-digit UPC to the main field and a 5-digit supplemental barcode to its own field. It keeps scanning until you stop it. The combined value is used as a lookup key, not treated as an official UPC. Verify any suggested issue before saving.</p>
       <div class="actions"><button type="button" class="primary" id="startScan">Start camera scanner</button><button type="button" id="stopScan" disabled>Stop scanner</button><button type="button" id="uploadBarcode">Scan from an image</button><input id="barcodeImage" class="hidden" type="file" accept="image/*" capture="environment"></div>
       <video id="video" class="hidden" playsinline></video>
       <div id="scanStatus" class="note" role="status">Ready to scan.</div>
@@ -80,10 +80,10 @@ footer{max-width:1100px;margin:auto;padding:0 16px 24px;color:var(--muted);font-
         <label>Main UPC (12 digits) <input id="barcode" inputmode="numeric" placeholder="Scan or enter main UPC"></label>
         <label>Supplemental code (usually 5 digits) <input id="supplement" inputmode="numeric" maxlength="5" placeholder="e.g., 00111"></label>
       </div>
-      <div id="issueSuggestion" class="note" style="margin-top:8px">Enter a 5-digit supplemental code to see a candidate issue number.</div>
+      <div id="issueSuggestion" class="note" style="margin-top:8px">Enter or scan both barcode parts. The combined lookup value will appear here.</div>
       <div class="actions"><button type="button" id="useSuggestedIssue">Apply suggested issue number</button></div>
       <div class="actions"><button type="button" id="searchBarcode">Search exact barcode online</button><button type="button" id="clearBarcode">Clear barcode</button></div>
-      <p class="note">Search opens a web search only when you tap the button. It uses the main UPC, supplemental code, and series title if you have entered one. Verify the issue and edition before saving.</p>
+      <p class="note">The scanner recognizes a 12-digit main UPC and a 5-digit supplemental code as separate values. The app combines them for searching while preserving both original values. Search opens only when you tap the button.</p>
     </div>
     <div class="panel">
       <h2 id="formTitle">Comic details</h2>
@@ -174,26 +174,24 @@ $('clearBarcode').addEventListener('click',()=>{$('barcode').value='';$('supplem
 function parseComicBarcode(mainRaw,suppRaw){
  const main=String(mainRaw||'').replace(/\D/g,'');
  const supplement=String(suppRaw||'').replace(/\D/g,'');
+ const combined=main+supplement;
  if(supplement.length===5){
    const issueCode=supplement.slice(0,3);
    const coverCode=supplement.slice(3,5);
    const issueNum=Number(issueCode);
-   return {main,supplement,issueNum:Number.isFinite(issueNum)?issueNum:null,coverCode};
+   return {main,supplement,combined,issueNum:Number.isFinite(issueNum)?issueNum:null,coverCode};
  }
- return {main,supplement,issueNum:null,coverCode:''};
+ return {main,supplement,combined,issueNum:null,coverCode:''};
 }
 let lastAutoSuggestedIssue='';
 function updateIssueSuggestion(){
  const parsed=parseComicBarcode($('barcode').value,$('supplement').value);
+ const combo=parsed.combined||'(waiting for main UPC)';
  if(parsed.issueNum!==null){
-   $('issueSuggestion').innerHTML='Candidate issue number: <b>#'+esc(parsed.issueNum)+'</b> · supplemental code '+esc(parsed.supplement)+' (cover/printing code '+esc(parsed.coverCode)+'). This is a suggestion, not a catalog match.';
-   // Put the candidate in the form automatically, but do not search or open a new window.
-   if(!$('issue').value || $('issue').value===lastAutoSuggestedIssue){
-     $('issue').value=String(parsed.issueNum);
-     lastAutoSuggestedIssue=String(parsed.issueNum);
-   }
+   $('issueSuggestion').innerHTML='Combined lookup value: <b>'+esc(combo)+'</b><br>Candidate issue: <b>#'+esc(parsed.issueNum)+'</b> · supplemental '+esc(parsed.supplement)+' (cover/printing code '+esc(parsed.coverCode)+'). Verify against the comic before saving.';
+   if(!$('issue').value || $('issue').value===lastAutoSuggestedIssue){$('issue').value=String(parsed.issueNum);lastAutoSuggestedIssue=String(parsed.issueNum)}
  } else {
-   $('issueSuggestion').textContent='Enter the 5-digit supplemental code (for example, 00111) to suggest an issue number.';
+   $('issueSuggestion').innerHTML='Combined lookup value: <b>'+esc(parsed.main||'(main UPC not scanned)')+(parsed.supplement?' + '+esc(parsed.supplement):' + (supplemental code not scanned)')+'</b>';
    if(lastAutoSuggestedIssue && $('issue').value===lastAutoSuggestedIssue) $('issue').value='';
    lastAutoSuggestedIssue='';
  }
@@ -201,40 +199,41 @@ function updateIssueSuggestion(){
 $('supplement').addEventListener('input',updateIssueSuggestion);
 $('useSuggestedIssue').addEventListener('click',()=>{
  const p=parseComicBarcode($('barcode').value,$('supplement').value);
- if(p.issueNum===null){$('scanStatus').textContent='Enter exactly 5 supplemental digits first.';return}
+ if(p.issueNum===null){$('scanStatus').textContent='Please scan or enter the 5-digit supplemental code first.';return}
  $('issue').value=String(p.issueNum);
- $('formBarcode').value=$('barcode').value.trim();
- $('notes').value=($('notes').value?$('notes').value+'\\n':'')+'Supplemental barcode: '+p.supplement+'; candidate issue #'+p.issueNum+'; cover/printing code '+p.coverCode+'. Verify against cover/catalog.';
- $('scanStatus').textContent='Candidate issue #'+p.issueNum+' entered in Comic details. No search was opened.';
+ $('formBarcode').value=p.main;
+ const line='Supplemental barcode: '+p.supplement+'; combined lookup value: '+p.combined+'; candidate issue #'+p.issueNum+'; cover/printing code '+p.coverCode+'. Verify against cover/catalog.';
+ const notes=$('notes').value.trim();
+ if(!notes.includes('combined lookup value: '+p.combined)) $('notes').value=(notes?notes+'\n':'')+line;
+ $('scanStatus').textContent='Applied: issue #'+p.issueNum+'. Combined lookup value '+p.combined+'. Check the issue number, then save the comic details.';
+ $('issue').focus();
 });
 $('barcode').addEventListener('input',updateIssueSuggestion);
 $('searchBarcode').addEventListener('click',()=>{
- const main=String($('barcode').value||'').replace(/\D/g,'');
- const supplement=String($('supplement').value||'').replace(/\D/g,'');
+ const p=parseComicBarcode($('barcode').value,$('supplement').value);
  const title=String($('seriesName').value||'').trim();
- if(!main){$('scanStatus').textContent='Scan or enter the main UPC first.';return}
- const parts=[main];
- if(supplement.length===5) parts.push(supplement);
- if(title) parts.push(title);
- parts.push('comic book');
- const parsed=parseComicBarcode(main,supplement);
- if(parsed.issueNum!==null) parts.push('issue '+parsed.issueNum);
- const query=parts.join(' ');
- $('scanStatus').textContent=supplement.length===5
-   ? 'Opening a broader search with both barcode parts'+(title?' and the series title':'')+'. Verify the result before saving.'
-   : 'Opening a search for the main UPC. Add the 5-digit supplemental code for a more specific search.';
+ if(!p.main){$('scanStatus').textContent='Scan or enter the main UPC first.';return}
+ const searches=[];
+ if(p.supplement.length===5) searches.push('"'+p.combined+'"');
+ searches.push('"'+p.main+'"');
+ if(p.supplement.length===5) searches.push(p.supplement);
+ if(title) searches.push(title);
+ searches.push('comic book');
+ if(p.issueNum!==null) searches.push('issue '+p.issueNum);
+ const query=searches.join(' ');
+ $('scanStatus').textContent=p.supplement.length===5?'Searching with combined value '+p.combined+' and fallback UPC '+p.main+'. Verify the matching cover and issue.':'Searching main UPC '+p.main+'. Scan the 5-digit supplemental code for a more specific lookup.';
  window.open('https://www.google.com/search?q='+encodeURIComponent(query),'_blank','noopener');
 });
 $('startScan').addEventListener('click',async()=>{
  if(!window.ZXingBrowser){$('scanStatus').textContent='Scanner library did not load. Check your internet connection and reload.';return}
  try{reader=new ZXingBrowser.BrowserMultiFormatReader();$('video').classList.remove('hidden');$('scanStatus').textContent='Requesting camera permission…';$('startScan').disabled=true;$('stopScan').disabled=false;
- scanControls=await reader.decodeFromVideoDevice(undefined,'video',(result,err,controls)=>{if(result){const code=result.getText();$('barcode').value=code.replace(/\D/g,'');$('formBarcode').value=code.replace(/\D/g,'');$('scanStatus').innerHTML='<span class="good">Main barcode detected:</span> '+esc(code)+'. Now enter the separate 5-digit supplemental code, then choose Search only when you are ready.';updateIssueSuggestion();stopScanner()}});
+ let lastCode='',lastAt=0;scanControls=await reader.decodeFromVideoDevice(undefined,'video',(result,err,controls)=>{if(!result)return;const raw=result.getText();const digits=raw.replace(/\D/g,'');const now=Date.now();if(digits===lastCode&&now-lastAt<1800)return;lastCode=digits;lastAt=now;if(digits.length===5){$('supplement').value=digits;$('scanStatus').innerHTML='<span class="good">Supplemental code captured:</span> '+esc(digits)+'. Keep scanning for the main UPC, or stop when finished.';}else if(digits.length===12||digits.length===13){$('barcode').value=digits.length===13?digits.slice(0,12):digits;$('formBarcode').value=$('barcode').value;$('scanStatus').innerHTML='<span class="good">Main UPC captured:</span> '+esc($('barcode').value)+'. Keep scanning for the 5-digit supplemental code.';}else{$('scanStatus').textContent='Barcode read ('+digits.length+' digits), but expected a 12-digit UPC or 5-digit supplemental code. Try again or enter it manually.';}updateIssueSuggestion()});
  }catch(e){$('scanStatus').textContent='Could not start camera. Use HTTPS, allow camera access, and try again. '+(e.message||'');stopScanner()}
 });
 function stopScanner(){try{if(scanControls)scanControls.stop();if(reader&&reader.reset)reader.reset()}catch(e){}scanControls=null;reader=null;$('startScan').disabled=false;$('stopScan').disabled=true}
 $('stopScan').addEventListener('click',stopScanner);
 $('uploadBarcode').addEventListener('click',()=>$('barcodeImage').click());
-$('barcodeImage').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;if(!window.ZXingBrowser){$('scanStatus').textContent='Scanner library did not load.';return}try{const url=URL.createObjectURL(file);reader=new ZXingBrowser.BrowserMultiFormatReader();const result=await reader.decodeFromImageUrl(url);$('barcode').value=result.getText();$('formBarcode').value=result.getText();$('scanStatus').textContent='Barcode detected from image: '+result.getText();URL.revokeObjectURL(url)}catch(err){$('scanStatus').textContent='No readable barcode found in that image. Try better lighting or enter it manually.'}e.target.value=''});
+$('barcodeImage').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;if(!window.ZXingBrowser){$('scanStatus').textContent='Scanner library did not load.';return}let url='';try{url=URL.createObjectURL(file);reader=new ZXingBrowser.BrowserMultiFormatReader();const result=await reader.decodeFromImageUrl(url);const digits=result.getText().replace(/\D/g,'');if(digits.length===5){$('supplement').value=digits;$('scanStatus').textContent='Supplemental code captured from image: '+digits;}else if(digits.length===12||digits.length===13){$('barcode').value=digits.length===13?digits.slice(0,12):digits;$('formBarcode').value=$('barcode').value;$('scanStatus').textContent='Main UPC captured from image: '+$('barcode').value;}else{$('scanStatus').textContent='Read '+digits.length+' digits; expected a 12-digit UPC or 5-digit supplemental code.'}updateIssueSuggestion()}catch(err){$('scanStatus').textContent='No readable barcode found in that image. Try better lighting or enter it manually.'}finally{if(url)URL.revokeObjectURL(url);e.target.value=''}});
 function renderSeries(){
 const groups={};for(const c of state.comics){if(c.status!=='Owned')continue;const k=c.series.trim();if(!k)continue;(groups[k]??=[]).push(c)}
 const names=Object.keys(groups).sort((a,b)=>a.localeCompare(b));
