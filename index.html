@@ -167,17 +167,10 @@ $('comicForm').addEventListener('submit',e=>{e.preventDefault();const d=getForm(
 $('resetForm').addEventListener('click',()=>fillForm(null));
 $('clearBarcode').addEventListener('click',()=>{$('barcode').value='';$('formBarcode').value='';$('scanStatus').textContent='Barcode cleared.'});
 $('searchBarcode').addEventListener('click',()=>{
-  const code=$('barcode').value.trim();
-  if(!code){
-    $('scanStatus').textContent='Scan or enter a barcode first.';
-    return;
-  }
-  const query='"'+code+'" comic book issue UPC';
-  window.open(
-    'https://www.google.com/search?q='+encodeURIComponent(query),
-    '_blank',
-    'noopener'
-  );
+ const code=$('barcode').value.trim();
+ if(!code){$('scanStatus').textContent='Scan or enter a barcode first.';return}
+ const query='"'+code+'" comic book UPC issue';
+ window.open('https://www.google.com/search?q='+encodeURIComponent(query),'_blank','noopener');
 });
 $('startScan').addEventListener('click',async()=>{
  if(!window.ZXingBrowser){$('scanStatus').textContent='Scanner library did not load. Check your internet connection and reload.';return}
