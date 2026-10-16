@@ -81,7 +81,7 @@ footer{max-width:1100px;margin:auto;padding:0 16px 24px;color:var(--muted);font-
         <label>Supplemental code (usually 5 digits) <input id="supplement" inputmode="numeric" maxlength="5" placeholder="e.g., 00111"></label>
       </div>
       <div id="issueSuggestion" class="note" style="margin-top:8px">Enter a 5-digit supplemental code to see a candidate issue number.</div>
-      <div class="actions"><button type="button" id="useSuggestedIssue">Use suggested issue number</button></div>
+      <div class="actions"><button type="button" id="useSuggestedIssue">Apply suggested issue number</button></div>
       <div class="actions"><button type="button" id="searchBarcode">Search exact barcode online</button><button type="button" id="clearBarcode">Clear barcode</button></div>
       <p class="note">Search opens a web search in a new tab. Check the issue and edition carefully; UPCs can be shared across editions or encode additional cover/issue information.</p>
     </div>
@@ -182,16 +182,31 @@ function parseComicBarcode(mainRaw,suppRaw){
  }
  return {main,supplement,issueNum:null,coverCode:''};
 }
+let lastAutoSuggestedIssue='';
 function updateIssueSuggestion(){
  const parsed=parseComicBarcode($('barcode').value,$('supplement').value);
  if(parsed.issueNum!==null){
-   $('issueSuggestion').innerHTML='Candidate issue number: <b>#'+esc(parsed.issueNum)+'</b> · supplemental code '+esc(parsed.supplement)+' (cover/printing code '+esc(parsed.coverCode)+'). Confirm this against the comic/catalog.';
+   $('issueSuggestion').innerHTML='Candidate issue number: <b>#'+esc(parsed.issueNum)+'</b> · supplemental code '+esc(parsed.supplement)+' (cover/printing code '+esc(parsed.coverCode)+'). This is a suggestion, not a catalog match.';
+   // Put the candidate in the form automatically, but do not search or open a new window.
+   if(!$('issue').value || $('issue').value===lastAutoSuggestedIssue){
+     $('issue').value=String(parsed.issueNum);
+     lastAutoSuggestedIssue=String(parsed.issueNum);
+   }
  } else {
-   $('issueSuggestion').textContent='Enter a 5-digit supplemental code to see a candidate issue number.';
+   $('issueSuggestion').textContent='Enter the 5-digit supplemental code (for example, 00111) to suggest an issue number.';
+   if(lastAutoSuggestedIssue && $('issue').value===lastAutoSuggestedIssue) $('issue').value='';
+   lastAutoSuggestedIssue='';
  }
 }
 $('supplement').addEventListener('input',updateIssueSuggestion);
-$('useSuggestedIssue').addEventListener('click',()=>{const p=parseComicBarcode($('barcode').value,$('supplement').value);if(p.issueNum===null){$('scanStatus').textContent='Enter a valid 5-digit supplemental code first.';return}$('issue').value=String(p.issueNum);$('formBarcode').value=$('barcode').value.trim();$('notes').value=($('notes').value?$('notes').value+'\n':'')+'Supplemental barcode: '+p.supplement+'; candidate issue #'+p.issueNum+'; cover/printing code '+p.coverCode+'. Verify catalog/cover.';$('scanStatus').textContent='Candidate issue #'+p.issueNum+' copied to comic details. Verify before saving.';});
+$('useSuggestedIssue').addEventListener('click',()=>{
+ const p=parseComicBarcode($('barcode').value,$('supplement').value);
+ if(p.issueNum===null){$('scanStatus').textContent='Enter exactly 5 supplemental digits first.';return}
+ $('issue').value=String(p.issueNum);
+ $('formBarcode').value=$('barcode').value.trim();
+ $('notes').value=($('notes').value?$('notes').value+'\\n':'')+'Supplemental barcode: '+p.supplement+'; candidate issue #'+p.issueNum+'; cover/printing code '+p.coverCode+'. Verify against cover/catalog.';
+ $('scanStatus').textContent='Candidate issue #'+p.issueNum+' entered in Comic details. No search was opened.';
+});
 $('barcode').addEventListener('input',updateIssueSuggestion);
 $('searchBarcode').addEventListener('click',()=>{
  const main=String($('barcode').value||'').replace(/\D/g,'');
@@ -204,14 +219,14 @@ $('searchBarcode').addEventListener('click',()=>{
    $('scanStatus').textContent='Searching main UPC plus supplemental code; candidate issue #'+parsed.issueNum+'. Verify the result before saving.';
  } else {
    query='"'+main+'" comic book UPC issue';
-   $('scanStatus').textContent='Searching the main UPC only. Add the 5-digit supplemental code for a more specific result.';
+   $('scanStatus').textContent='Main UPC scanned. Enter the supplemental code to suggest an issue; search only when you tap Search.';
  }
  window.open('https://www.google.com/search?q='+encodeURIComponent(query),'_blank','noopener');
 });
 $('startScan').addEventListener('click',async()=>{
  if(!window.ZXingBrowser){$('scanStatus').textContent='Scanner library did not load. Check your internet connection and reload.';return}
  try{reader=new ZXingBrowser.BrowserMultiFormatReader();$('video').classList.remove('hidden');$('scanStatus').textContent='Requesting camera permission…';$('startScan').disabled=true;$('stopScan').disabled=false;
- scanControls=await reader.decodeFromVideoDevice(undefined,'video',(result,err,controls)=>{if(result){const code=result.getText();$('barcode').value=code.replace(/\\D/g,'');$('formBarcode').value=code.replace(/\\D/g,'');$('scanStatus').innerHTML='<span class="good">Main barcode detected:</span> '+esc(code)+'. Now enter the separate 5-digit supplemental code, then choose Search only when you are ready.';updateIssueSuggestion();stopScanner()}});
+ scanControls=await reader.decodeFromVideoDevice(undefined,'video',(result,err,controls)=>{if(result){const code=result.getText();$('barcode').value=code.replace(/\D/g,'');$('formBarcode').value=code.replace(/\D/g,'');$('scanStatus').innerHTML='<span class="good">Main barcode detected:</span> '+esc(code)+'. Now enter the separate 5-digit supplemental code, then choose Search only when you are ready.';updateIssueSuggestion();stopScanner()}});
  }catch(e){$('scanStatus').textContent='Could not start camera. Use HTTPS, allow camera access, and try again. '+(e.message||'');stopScanner()}
 });
 function stopScanner(){try{if(scanControls)scanControls.stop();if(reader&&reader.reset)reader.reset()}catch(e){}scanControls=null;reader=null;$('startScan').disabled=false;$('stopScan').disabled=true}
