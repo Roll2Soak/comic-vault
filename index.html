@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#18212f">
+<title>Comic Vault — Personal Collection</title>
+<style>
+:root{--bg:#f4f6f9;--panel:#fff;--ink:#18212f;--muted:#667085;--line:#dce2ea;--accent:#2557a7;--accent2:#e9effa;--danger:#b42318;--ok:#067647}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{background:#18212f;color:white;padding:18px max(16px,calc((100% - 1100px)/2));}
+header h1{font-size:1.45rem;margin:0 0 4px}header p{margin:0;color:#d3dbe8;font-size:.92rem}
+main{max-width:1100px;margin:auto;padding:16px;display:grid;gap:14px}
+nav{display:flex;gap:8px;flex-wrap:wrap}
+button,.button{border:1px solid var(--line);background:white;color:var(--ink);padding:10px 13px;border-radius:10px;font:inherit;cursor:pointer}
+button.primary{background:var(--accent);color:white;border-color:var(--accent)}button.active{background:var(--accent2);border-color:#9db6e7;color:#173d7a}
+button.danger{color:var(--danger)}button:disabled{opacity:.5;cursor:not-allowed}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 1px 2px #1018280a}
+.panel h2{font-size:1.08rem;margin:0 0 12px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.stat{background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:12px}.stat .num{font-size:1.5rem;font-weight:750}.stat .label{color:var(--muted);font-size:.84rem}
+.formgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+label{display:block;font-size:.85rem;color:#344054;font-weight:650}input,select,textarea{width:100%;margin-top:4px;padding:10px;border:1px solid #cbd5e1;border-radius:9px;font:inherit;background:white;color:var(--ink)}
+textarea{min-height:75px;resize:vertical}.full{grid-column:1/-1}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.note{font-size:.88rem;color:var(--muted)}.warning{background:#fff8e7;border:1px solid #f2d28a;border-radius:10px;padding:11px;color:#694b00;font-size:.9rem}
+.good{color:var(--ok)}.bad{color:var(--danger)}.hidden{display:none!important}
+.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:.91rem}th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:.8rem;color:var(--muted);white-space:nowrap}
+td button{padding:5px 8px;font-size:.82rem}.pill{display:inline-block;background:#eef2f6;border-radius:99px;padding:2px 8px;font-size:.78rem}
+#video{width:100%;max-height:330px;background:#101828;border-radius:12px;object-fit:contain}#scanStatus{margin:8px 0}.coverthumb{width:44px;height:60px;object-fit:cover;border-radius:4px;background:#eef2f6}
+.searchrow{display:flex;gap:8px}.searchrow input{flex:1}
+footer{max-width:1100px;margin:auto;padding:0 16px 24px;color:var(--muted);font-size:.82rem}
+@media(max-width:700px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.formgrid{grid-template-columns:repeat(2,minmax(0,1fr))}main{padding:10px}.panel{padding:12px}header{padding:16px}table{font-size:.84rem}}
+@media(max-width:430px){.formgrid{grid-template-columns:1fr}.full{grid-column:auto}.stats .num{font-size:1.25rem}}
+</style>
+</head>
+<body>
+<header><h1>📚 Comic Vault</h1><p>Your private comic inventory — no account, no subscription, local storage.</p></header>
+<main>
+  <nav aria-label="Main sections">
+    <button class="active" data-view="dashboard">Dashboard</button>
+    <button data-view="inventory">Inventory</button>
+    <button data-view="add">Add / Scan</button>
+    <button data-view="series">Series</button>
+    <button data-view="backup">Backup & Data</button>
+  </nav>
+
+  <section id="view-dashboard" class="view">
+    <div class="stats">
+      <div class="stat"><div id="statCount" class="num">0</div><div class="label">Comics in collection</div></div>
+      <div class="stat"><div id="statSeries" class="num">0</div><div class="label">Series tracked</div></div>
+      <div class="stat"><div id="statPaid" class="num">$0</div><div class="label">Total paid</div></div>
+      <div class="stat"><div id="statValue" class="num">$0</div><div class="label">Estimated value</div></div>
+    </div>
+    <div class="panel" style="margin-top:14px"><h2>Quick start</h2>
+      <p>Add comics one at a time, or import a CSV you already have. On a phone, use <b>Add / Scan</b> to scan a barcode, then verify the details before saving.</p>
+      <div class="warning">Your collection is saved in this browser on this device. Export a backup regularly. Clearing browser data or using another browser/device will not carry your collection over automatically.</div>
+      <div class="actions"><button class="primary" onclick="showView('add')">Add your first comic</button><button onclick="showView('backup')">Make a backup</button></div>
+    </div>
+    <div class="panel" style="margin-top:14px"><h2>Recently added</h2><div id="recentList" class="note">No comics yet.</div></div>
+  </section>
+
+  <section id="view-inventory" class="view hidden">
+    <div class="panel">
+      <h2>Inventory</h2>
+      <div class="searchrow"><input id="inventorySearch" placeholder="Search title, series, issue, barcode, box…" aria-label="Search inventory"><button onclick="renderInventory()">Search</button></div>
+      <div class="actions"><select id="statusFilter" aria-label="Filter by status" style="max-width:220px"><option value="">All statuses</option><option>Owned</option><option>Want</option><option>For Sale</option><option>Loaned</option></select><button onclick="renderInventory()">Apply filter</button></div>
+      <div id="inventorySummary" class="note" style="margin:12px 0"></div>
+      <div class="tablewrap"><table><thead><tr><th>Comic</th><th>Publisher / Year</th><th>Condition</th><th>Paid</th><th>Value</th><th>Box</th><th>Status</th><th>Actions</th></tr></thead><tbody id="inventoryBody"></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="view-add" class="view hidden">
+    <div class="panel">
+      <h2>Scan a barcode</h2>
+      <p class="note">Camera scanning requires this page to be opened over HTTPS (for example, a free static host) and permission to use the camera. The barcode is scanned locally; this app does not automatically have a complete comic catalog to resolve every code.</p>
+      <div class="actions"><button class="primary" id="startScan">Start camera scanner</button><button id="stopScan" disabled>Stop scanner</button><button id="uploadBarcode">Scan from an image</button><input id="barcodeImage" class="hidden" type="file" accept="image/*" capture="environment"></div>
+      <video id="video" class="hidden" playsinline></video>
+      <div id="scanStatus" class="note" role="status">Ready to scan.</div>
+      <label>Barcode / UPC <input id="barcode" inputmode="numeric" placeholder="Scanned or enter barcode"></label>
+      <div class="actions"><button id="searchBarcode">Search web for this barcode</button><button id="clearBarcode">Clear barcode</button></div>
+      <p class="note">Search opens a web search in a new tab. Check the issue and edition carefully; UPCs can be shared across editions or encode additional cover/issue information.</p>
+    </div>
+    <div class="panel">
+      <h2 id="formTitle">Comic details</h2>
+      <form id="comicForm">
+        <input id="editId" type="hidden">
+        <div class="formgrid">
+          <label>Series / title *<input id="seriesName" required placeholder="e.g., Amazing Spider-Man"></label>
+          <label>Issue number *<input id="issue" required placeholder="e.g., 300"></label>
+          <label>Variant / edition<input id="variant" placeholder="e.g., Newsstand, 1:25"></label>
+          <label>Publisher<input id="publisher" placeholder="e.g., Marvel"></label>
+          <label>Cover / publication year<input id="year" type="number" min="1900" max="2100" placeholder="e.g., 1988"></label>
+          <label>Barcode / UPC<input id="formBarcode" inputmode="numeric" placeholder="Optional"></label>
+          <label>Condition
+            <select id="condition"><option value="">Not graded</option><option>Mint</option><option>Near Mint</option><option>Very Fine</option><option>Fine</option><option>Very Good</option><option>Good</option><option>Fair</option><option>Poor</option><option>CGC/CBCS graded</option></select>
+          </label>
+          <label>Grade / slab label<input id="grade" placeholder="e.g., 9.4, CGC 9.6"></label>
+          <label>Purchase price ($)<input id="paid" type="number" min="0" step="0.01" placeholder="0.00"></label>
+          <label>Estimated value ($)<input id="value" type="number" min="0" step="0.01" placeholder="0.00"></label>
+          <label>Storage box / location<input id="box" placeholder="e.g., Box 12, short box A"></label>
+          <label>Status<select id="status"><option>Owned</option><option>Want</option><option>For Sale</option><option>Loaned</option></select></label>
+          <label>Cover image URL<input id="coverUrl" type="url" placeholder="Optional image link"></label>
+          <label class="full">Notes<textarea id="notes" placeholder="Signature, printing, missing pages, source of valuation, etc."></textarea></label>
+        </div>
+        <div class="actions"><button class="primary" type="submit">Save comic</button><button type="button" id="resetForm">Clear form</button></div>
+        <p class="note">Fields marked * are required. Value is your own estimate; the app does not claim to provide live market prices.</p>
+      </form>
+    </div>
+  </section>
+
+  <section id="view-series" class="view hidden">
+    <div class="panel">
+      <h2>Series tracker</h2>
+      <p class="note">This view counts unique issue labels you have marked Owned. To calculate completion, enter the known issue range for a series. Special issues, annuals, and variants may need separate tracking.</p>
+      <div class="tablewrap"><table><thead><tr><th>Series</th><th>Owned issues</th><th>Range / goal</th><th>Completion</th><th>Set goal</th></tr></thead><tbody id="seriesBody"></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="view-backup" class="view hidden">
+    <div class="panel"><h2>Backup & data transfer</h2>
+      <p>Export a full JSON backup before changing phones or browsers. CSV is useful for spreadsheets, but JSON is the best format for restoring all app data, including series goals.</p>
+      <div class="actions"><button class="primary" id="exportJson">Download full backup (JSON)</button><button id="exportCsv">Export inventory (CSV)</button><button id="importJson">Restore JSON backup</button><button id="importCsv">Import inventory CSV</button><input id="jsonFile" type="file" accept=".json,application/json" class="hidden"><input id="csvFile" type="file" accept=".csv,text/csv" class="hidden"></div>
+      <div id="dataStatus" class="note" style="margin-top:12px"></div>
+      <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+      <h2>Privacy and storage</h2>
+      <ul><li>No login or account.</li><li>Records are saved in this browser's local storage.</li><li>Barcode search opens an external search page only when you press the button.</li><li>Cover image URLs, if entered, load from their original website.</li><li>This version has no automatic cloud sync.</li></ul>
+      <div class="warning">Do not rely on browser storage as your only copy. Keep a JSON backup somewhere safe.</div>
+      <div class="actions"><button class="danger" id="clearAll">Delete all local collection data</button></div>
+    </div>
+  </section>
+</main>
+<footer>Comic Vault is a personal catalog tool, not a valuation service. Always verify issue, printing, and variant details. Keep regular backups.</footer>
+
+<script src="https://unpkg.com/@zxing/browser@latest"></script>
+<script>
+const STORAGE_KEY='comicVault.personal.v1';
+let state={comics:[],seriesGoals:{}};
+let reader=null, scanControls=null;
+const $=id=>document.getElementById(id);
+const fields=['seriesName','issue','variant','publisher','year','formBarcode','condition','grade','paid','value','box','status','coverUrl','notes'];
+const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(Number(n)||0);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function load(){try{const x=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');if(Array.isArray(x.comics))state.comics=x.comics;if(x.seriesGoals&&typeof x.seriesGoals==='object')state.seriesGoals=x.seriesGoals}catch(e){console.warn(e)}renderAll()}
+function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));renderAll()}
+function showView(name){document.querySelectorAll('.view').forEach(v=>v.classList.add('hidden'));$('view-'+name).classList.remove('hidden');document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===name));if(name==='inventory')renderInventory();if(name==='series')renderSeries();window.scrollTo({top:0,behavior:'smooth'})}
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
+function renderAll(){renderDashboard();renderInventory();renderSeries()}
+function renderDashboard(){
+$('statCount').textContent=state.comics.filter(c=>c.status==='Owned').length;
+$('statSeries').textContent=new Set(state.comics.map(c=>c.series.trim().toLowerCase()).filter(Boolean)).size;
+$('statPaid').textContent=money(state.comics.filter(c=>c.status==='Owned').reduce((s,c)=>s+(Number(c.paid)||0),0));
+$('statValue').textContent=money(state.comics.filter(c=>c.status==='Owned').reduce((s,c)=>s+(Number(c.value)||0),0));
+const recent=[...state.comics].sort((a,b)=>(b.updated||b.created||0)-(a.updated||a.created||0)).slice(0,5);
+$('recentList').innerHTML=recent.length?'<div class="tablewrap"><table><tbody>'+recent.map(c=>`<tr><td>${esc(c.series)} #${esc(c.issue)} ${c.variant?'<span class="pill">'+esc(c.variant)+'</span>':''}</td><td>${esc(c.box||'No box assigned')}</td><td>${money(c.value)}</td></tr>`).join('')+'</tbody></table></div>':'No comics yet.';
+}
+function renderInventory(){
+const q=$('inventorySearch').value.trim().toLowerCase(),status=$('statusFilter').value;
+const list=state.comics.filter(c=>(!status||c.status===status)&&(!q||[c.series,c.issue,c.variant,c.publisher,c.barcode,c.box,c.notes,c.year].join(' ').toLowerCase().includes(q)));
+$('inventorySummary').textContent=`Showing ${list.length} of ${state.comics.length} records.`;
+$('inventoryBody').innerHTML=list.map(c=>`<tr><td><b>${esc(c.series)}</b> #${esc(c.issue)}${c.variant?'<br><span class="pill">'+esc(c.variant)+'</span>':''}${c.barcode?'<br><span class="note">UPC '+esc(c.barcode)+'</span>':''}</td><td>${esc(c.publisher||'—')}<br>${esc(c.year||'')}</td><td>${esc(c.condition||'—')}${c.grade?'<br>'+esc(c.grade):''}</td><td>${money(c.paid)}</td><td>${money(c.value)}</td><td>${esc(c.box||'—')}</td><td>${esc(c.status||'Owned')}</td><td><button onclick="editComic('${c.id}')">Edit</button> <button class="danger" onclick="deleteComic('${c.id}')">Delete</button></td></tr>`).join('')||'<tr><td colspan="8" class="note">No matching comics.</td></tr>';
+}
+function getForm(){return {series:$('seriesName').value.trim(),issue:$('issue').value.trim(),variant:$('variant').value.trim(),publisher:$('publisher').value.trim(),year:$('year').value,barcode:$('formBarcode').value.trim(),condition:$('condition').value,grade:$('grade').value.trim(),paid:Number($('paid').value)||0,value:Number($('value').value)||0,box:$('box').value.trim(),status:$('status').value,coverUrl:$('coverUrl').value.trim(),notes:$('notes').value.trim()}}
+function fillForm(c){$('editId').value=c?.id||'';$('seriesName').value=c?.series||'';$('issue').value=c?.issue||'';$('variant').value=c?.variant||'';$('publisher').value=c?.publisher||'';$('year').value=c?.year||'';$('formBarcode').value=c?.barcode||'';$('condition').value=c?.condition||'';$('grade').value=c?.grade||'';$('paid').value=c?.paid??'';$('value').value=c?.value??'';$('box').value=c?.box||'';$('status').value=c?.status||'Owned';$('coverUrl').value=c?.coverUrl||'';$('notes').value=c?.notes||'';$('formTitle').textContent=c?'Edit comic':'Comic details';showView('add')}
+function editComic(id){const c=state.comics.find(x=>x.id===id);if(c)fillForm(c)}
+function deleteComic(id){const c=state.comics.find(x=>x.id===id);if(c&&confirm(`Delete ${c.series} #${c.issue}?`)){state.comics=state.comics.filter(x=>x.id!==id);save()}}
+$('comicForm').addEventListener('submit',e=>{e.preventDefault();const d=getForm();if(!d.series||!d.issue)return;const id=$('editId').value||('c_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7));const old=state.comics.find(c=>c.id===id);const c={...d,id,created:old?.created||Date.now(),updated:Date.now()};if(old)state.comics=state.comics.map(x=>x.id===id?c:x);else state.comics.push(c);save();fillForm(null);$('dataStatus').textContent='Saved.';showView('inventory')});
+$('resetForm').addEventListener('click',()=>fillForm(null));
+$('clearBarcode').addEventListener('click',()=>{$('barcode').value='';$('formBarcode').value='';$('scanStatus').textContent='Barcode cleared.'});
+$('searchBarcode').addEventListener('click',()=>{const code=$('barcode').value.trim();if(!code){$('scanStatus').textContent='Scan or enter a barcode first.';return}window.open('https://www.google.com/search?q='+encodeURIComponent('comic book barcode UPC '+code),'_blank','noopener')});
+$('startScan').addEventListener('click',async()=>{
+ if(!window.ZXingBrowser){$('scanStatus').textContent='Scanner library did not load. Check your internet connection and reload.';return}
+ try{reader=new ZXingBrowser.BrowserMultiFormatReader();$('video').classList.remove('hidden');$('scanStatus').textContent='Requesting camera permission…';$('startScan').disabled=true;$('stopScan').disabled=false;
+ scanControls=await reader.decodeFromVideoDevice(undefined,'video',(result,err,controls)=>{if(result){const code=result.getText();$('barcode').value=code;$('formBarcode').value=code;$('scanStatus').innerHTML='<span class="good">Barcode detected:</span> '+esc(code)+'. Verify the comic details below.';stopScanner();$('seriesName').focus()}});
+ }catch(e){$('scanStatus').textContent='Could not start camera. Use HTTPS, allow camera access, and try again. '+(e.message||'');stopScanner()}
+});
+function stopScanner(){try{if(scanControls)scanControls.stop();if(reader&&reader.reset)reader.reset()}catch(e){}scanControls=null;reader=null;$('startScan').disabled=false;$('stopScan').disabled=true}
+$('stopScan').addEventListener('click',stopScanner);
+$('uploadBarcode').addEventListener('click',()=>$('barcodeImage').click());
+$('barcodeImage').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;if(!window.ZXingBrowser){$('scanStatus').textContent='Scanner library did not load.';return}try{const url=URL.createObjectURL(file);reader=new ZXingBrowser.BrowserMultiFormatReader();const result=await reader.decodeFromImageUrl(url);$('barcode').value=result.getText();$('formBarcode').value=result.getText();$('scanStatus').textContent='Barcode detected from image: '+result.getText();URL.revokeObjectURL(url)}catch(err){$('scanStatus').textContent='No readable barcode found in that image. Try better lighting or enter it manually.'}e.target.value=''});
+function renderSeries(){
+const groups={};for(const c of state.comics){if(c.status!=='Owned')continue;const k=c.series.trim();if(!k)continue;(groups[k]??=[]).push(c)}
+const names=Object.keys(groups).sort((a,b)=>a.localeCompare(b));
+$('seriesBody').innerHTML=names.map(name=>{const issues=[...new Set(groups[name].map(c=>c.issue))];const goal=state.seriesGoals[name]||'';let pct='—';if(goal&&Number(goal)>0){const owned=new Set();issues.forEach(x=>{const n=Number(x);if(Number.isFinite(n))owned.add(n)});pct=Math.min(100,Math.round(owned.size/Number(goal)*100))+'%'}return `<tr><td><b>${esc(name)}</b></td><td>${issues.map(esc).join(', ')}</td><td>${goal?esc(goal)+' issues':'Not set'}</td><td>${pct}</td><td><button onclick="setGoal(${JSON.stringify(name).replace(/"/g,'&quot;')})">Set goal</button></td></tr>`}).join('')||'<tr><td colspan="5" class="note">Add owned comics to start tracking series.</td></tr>';
+}
+function setGoal(name){const current=state.seriesGoals[name]||'';const val=prompt(`How many numbered issues are in "${name}"? Enter the total issue count for a rough completion estimate.`,current);if(val===null)return;if(val.trim()===''||!Number.isFinite(Number(val))||Number(val)<=0){delete state.seriesGoals[name]}else state.seriesGoals[name]=Number(val);save()}
+function download(name,content,type){const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url)}
+$('exportJson').addEventListener('click',()=>{download('comic-vault-backup-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify({...state,exportedAt:new Date().toISOString(),formatVersion:1},null,2),'application/json');$('dataStatus').textContent='Full backup downloaded.'});
+const csvFields=['series','issue','variant','publisher','year','barcode','condition','grade','paid','value','box','status','coverUrl','notes'];
+function csvCell(v){const s=String(v??'');return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+$('exportCsv').addEventListener('click',()=>{const rows=[csvFields.join(',')];state.comics.forEach(c=>rows.push(csvFields.map(k=>csvCell(c[k])).join(',')));download('comic-vault-inventory.csv',rows.join('\r\n'),'text/csv;charset=utf-8');$('dataStatus').textContent='CSV exported.'});
+$('importJson').addEventListener('click',()=>$('jsonFile').click());
+$('jsonFile').addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{const x=JSON.parse(await f.text());if(!Array.isArray(x.comics))throw new Error('Backup does not contain a comics list.');if(!confirm(`Restore ${x.comics.length} comics? This replaces the current local collection.`))return;state={comics:x.comics,seriesGoals:x.seriesGoals||{}};save();$('dataStatus').textContent='Backup restored.'}catch(err){alert('Could not restore backup: '+err.message)}e.target.value=''});
+$('importCsv').addEventListener('click',()=>$('csvFile').click());
+function parseCSV(text){const rows=[];let row=[],cell='',quoted=false;for(let i=0;i<text.length;i++){const ch=text[i];if(quoted){if(ch==='"'&&text[i+1]==='"'){cell+='"';i++}else if(ch==='"')quoted=false;else cell+=ch}else{if(ch==='"')quoted=true;else if(ch===','){row.push(cell);cell=''}else if(ch==='\n'){row.push(cell.replace(/\r$/,''));rows.push(row);row=[];cell=''}else cell+=ch}}if(cell.length||row.length){row.push(cell.replace(/\r$/,''));rows.push(row)}return rows}
+$('csvFile').addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{const rows=parseCSV(await f.text());if(rows.length<2)throw new Error('CSV has no data rows.');const headers=rows.shift().map(x=>x.trim());const added=rows.filter(r=>r.some(v=>v.trim())).map(r=>{const c={};headers.forEach((h,i)=>c[h]=r[i]??'');return {id:'c_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),series:c.series||c.Series||'',issue:c.issue||c.Issue||'',variant:c.variant||'',publisher:c.publisher||'',year:c.year||'',barcode:c.barcode||'',condition:c.condition||'',grade:c.grade||'',paid:Number(c.paid)||0,value:Number(c.value)||0,box:c.box||'',status:c.status||'Owned',coverUrl:c.coverUrl||'',notes:c.notes||'',created:Date.now(),updated:Date.now()}});if(!confirm(`Import ${added.length} rows and add them to the current collection?`))return;state.comics.push(...added);save();$('dataStatus').textContent=`Imported ${added.length} rows.`}catch(err){alert('Could not import CSV: '+err.message)}e.target.value=''});
+$('clearAll').addEventListener('click',()=>{if(confirm('This permanently deletes all Comic Vault records from this browser. Download a backup first. Continue?')&&confirm('Are you absolutely sure?')){state={comics:[],seriesGoals:{}};save();$('dataStatus').textContent='Local collection cleared.'}});
+load();
+</script>
+</body>
+</html>
