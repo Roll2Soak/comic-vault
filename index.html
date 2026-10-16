@@ -73,7 +73,7 @@ footer{max-width:1100px;margin:auto;padding:0 16px 24px;color:var(--muted);font-
     <div class="panel">
       <h2>Scan a barcode</h2>
       <p class="note">Camera scanning requires this page to be opened over HTTPS (for example, a free static host) and permission to use the camera. Scan the main UPC, then scan or type the separate 5-digit supplemental code. For common US comic UPC add-ons, the first 3 digits suggest the issue number and the final 2 digits encode cover/printing information. Verify the suggested issue before saving.</p>
-      <div class="actions"><button class="primary" id="startScan">Start camera scanner</button><button id="stopScan" disabled>Stop scanner</button><button id="uploadBarcode">Scan from an image</button><input id="barcodeImage" class="hidden" type="file" accept="image/*" capture="environment"></div>
+      <div class="actions"><button type="button" class="primary" id="startScan">Start camera scanner</button><button type="button" id="stopScan" disabled>Stop scanner</button><button type="button" id="uploadBarcode">Scan from an image</button><input id="barcodeImage" class="hidden" type="file" accept="image/*" capture="environment"></div>
       <video id="video" class="hidden" playsinline></video>
       <div id="scanStatus" class="note" role="status">Ready to scan.</div>
       <div class="formgrid" style="margin-top:8px">
@@ -82,7 +82,7 @@ footer{max-width:1100px;margin:auto;padding:0 16px 24px;color:var(--muted);font-
       </div>
       <div id="issueSuggestion" class="note" style="margin-top:8px">Enter a 5-digit supplemental code to see a candidate issue number.</div>
       <div class="actions"><button type="button" id="useSuggestedIssue">Use suggested issue number</button></div>
-      <div class="actions"><button id="searchBarcode">Search exact barcode online</button><button id="clearBarcode">Clear barcode</button></div>
+      <div class="actions"><button type="button" id="searchBarcode">Search exact barcode online</button><button type="button" id="clearBarcode">Clear barcode</button></div>
       <p class="note">Search opens a web search in a new tab. Check the issue and edition carefully; UPCs can be shared across editions or encode additional cover/issue information.</p>
     </div>
     <div class="panel">
@@ -211,7 +211,7 @@ $('searchBarcode').addEventListener('click',()=>{
 $('startScan').addEventListener('click',async()=>{
  if(!window.ZXingBrowser){$('scanStatus').textContent='Scanner library did not load. Check your internet connection and reload.';return}
  try{reader=new ZXingBrowser.BrowserMultiFormatReader();$('video').classList.remove('hidden');$('scanStatus').textContent='Requesting camera permission…';$('startScan').disabled=true;$('stopScan').disabled=false;
- scanControls=await reader.decodeFromVideoDevice(undefined,'video',(result,err,controls)=>{if(result){const code=result.getText();$('barcode').value=code;$('formBarcode').value=code;$('scanStatus').innerHTML='<span class="good">Barcode detected:</span> '+esc(code)+'. Verify the comic details below.';stopScanner();$('seriesName').focus()}});
+ scanControls=await reader.decodeFromVideoDevice(undefined,'video',(result,err,controls)=>{if(result){const code=result.getText();$('barcode').value=code.replace(/\\D/g,'');$('formBarcode').value=code.replace(/\\D/g,'');$('scanStatus').innerHTML='<span class="good">Main barcode detected:</span> '+esc(code)+'. Now enter the separate 5-digit supplemental code, then choose Search only when you are ready.';updateIssueSuggestion();stopScanner()}});
  }catch(e){$('scanStatus').textContent='Could not start camera. Use HTTPS, allow camera access, and try again. '+(e.message||'');stopScanner()}
 });
 function stopScanner(){try{if(scanControls)scanControls.stop();if(reader&&reader.reset)reader.reset()}catch(e){}scanControls=null;reader=null;$('startScan').disabled=false;$('stopScan').disabled=true}
