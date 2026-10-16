@@ -83,7 +83,7 @@ footer{max-width:1100px;margin:auto;padding:0 16px 24px;color:var(--muted);font-
       <div id="issueSuggestion" class="note" style="margin-top:8px">Enter a 5-digit supplemental code to see a candidate issue number.</div>
       <div class="actions"><button type="button" id="useSuggestedIssue">Apply suggested issue number</button></div>
       <div class="actions"><button type="button" id="searchBarcode">Search exact barcode online</button><button type="button" id="clearBarcode">Clear barcode</button></div>
-      <p class="note">Search opens a web search in a new tab. Check the issue and edition carefully; UPCs can be shared across editions or encode additional cover/issue information.</p>
+      <p class="note">Search opens a web search only when you tap the button. It uses the main UPC, supplemental code, and series title if you have entered one. Verify the issue and edition before saving.</p>
     </div>
     <div class="panel">
       <h2 id="formTitle">Comic details</h2>
@@ -211,16 +211,18 @@ $('barcode').addEventListener('input',updateIssueSuggestion);
 $('searchBarcode').addEventListener('click',()=>{
  const main=String($('barcode').value||'').replace(/\D/g,'');
  const supplement=String($('supplement').value||'').replace(/\D/g,'');
+ const title=String($('seriesName').value||'').trim();
  if(!main){$('scanStatus').textContent='Scan or enter the main UPC first.';return}
- let query;
- if(supplement.length===5){
-   const parsed=parseComicBarcode(main,supplement);
-   query='"'+main+'" "'+supplement+'" comic book issue '+parsed.issueNum;
-   $('scanStatus').textContent='Searching main UPC plus supplemental code; candidate issue #'+parsed.issueNum+'. Verify the result before saving.';
- } else {
-   query='"'+main+'" comic book UPC issue';
-   $('scanStatus').textContent='Main UPC scanned. Enter the supplemental code to suggest an issue; search only when you tap Search.';
- }
+ const parts=[main];
+ if(supplement.length===5) parts.push(supplement);
+ if(title) parts.push(title);
+ parts.push('comic book');
+ const parsed=parseComicBarcode(main,supplement);
+ if(parsed.issueNum!==null) parts.push('issue '+parsed.issueNum);
+ const query=parts.join(' ');
+ $('scanStatus').textContent=supplement.length===5
+   ? 'Opening a broader search with both barcode parts'+(title?' and the series title':'')+'. Verify the result before saving.'
+   : 'Opening a search for the main UPC. Add the 5-digit supplemental code for a more specific search.';
  window.open('https://www.google.com/search?q='+encodeURIComponent(query),'_blank','noopener');
 });
 $('startScan').addEventListener('click',async()=>{
