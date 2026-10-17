@@ -62,11 +62,11 @@ const base = 'http://127.0.0.1:8000';
     const afterInvalid = await page.evaluate(() => JSON.parse(localStorage.getItem('comicVault.personal.v1')));
     check(afterInvalid.comics.length === 1 && afterInvalid.comics[0].series === 'Imported Test', 'Invalid JSON replaced the existing collection');
 
+    page.once('dialog', d => d.accept());
     await page.locator('#csvFile').setInputFiles({
       name: 'test.csv', mimeType: 'text/csv',
       buffer: Buffer.from('series,issue,publisher,paid,value,status\nCSV Test,3,Test Publisher,4,8,Owned\n')
     });
-    page.once('dialog', d => d.accept());
     const afterCsv = await page.evaluate(() => JSON.parse(localStorage.getItem('comicVault.personal.v1')));
     check(afterCsv.comics.length === 2 && afterCsv.comics.some(c => c.series === 'CSV Test' && c.issue === '3'), 'CSV import failed');
 
