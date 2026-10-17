@@ -269,7 +269,20 @@ state={comics,seriesGoals:goals};save();$('dataStatus').textContent='Backup rest
 }catch(err){alert('Could not restore backup: '+err.message)}e.target.value=''});
 $('importCsv').addEventListener('click',()=>$('csvFile').click());
 function parseCSV(text){const rows=[];let row=[],cell='',quoted=false;for(let i=0;i<text.length;i++){const ch=text[i];if(quoted){if(ch==='"'&&text[i+1]==='"'){cell+='"';i++}else if(ch==='"')quoted=false;else cell+=ch}else{if(ch==='"')quoted=true;else if(ch===','){row.push(cell);cell=''}else if(ch==='\n'){row.push(cell.replace(/\r$/,''));rows.push(row);row=[];cell=''}else cell+=ch}}if(cell.length||row.length){row.push(cell.replace(/\r$/,''));rows.push(row)}return rows}
-$('csvFile').addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{const rows=parseCSV(await f.text());if(rows.length<2)throw new Error('CSV has no data rows.');const headers=rows.shift().map(x=>x.trim());const added=rows.filter(r=>r.some(v=>v.trim())).map(r=>{const c={};headers.forEach((h,i)=>c[h]=r[i]??'');return {id:'c_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),series:c.series||c.Series||'',issue:c.issue||c.Issue||'',variant:c.variant||'',publisher:c.publisher||'',year:c.year||'',barcode:c.barcode||'',condition:c.condition||'',grade:c.grade||'',paid:Number(c.paid)||0,value:Number(c.value)||0,box:c.box||'',status:c.status||'Owned',coverUrl:c.coverUrl||'',notes:c.notes||'',created:Date.now(),updated:Date.now()}});if(!confirm(`Import ${added.length} rows and add them to the current collection?`))return;state.comics.push(...added);save();$('dataStatus').textContent=`Imported ${added.length} rows.`}catch(err){alert('Could not import CSV: '+err.message)}e.target.value=''});
+$('csvFile').addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{
+if(f.size>10*1024*1024)throw new Error('CSV is larger than the 10 MB safety limit.');
+const rows=parseCSV(await f.text());if(rows.length<2)throw new Error('CSV has no data rows.');
+if(rows.length>20001)throw new Error('CSV contains too many rows (maximum 20,000 comics).');
+const headers=rows.shift().map(x=>x.trim().toLowerCase());
+const txt=(v,max=2000)=>String(v??'').slice(0,max);
+const num=(v,min=0,max=100000000)=>{if(v===''||v===null||v===undefined)return 0;const n=Number(v);if(!Number.isFinite(n)||n<min||n>max)throw new Error('CSV contains an invalid numeric value.');return n};
+const statuses=new Set(['Owned','Want','For Sale','Loaned']);
+const conditions=new Set(['','Mint','Near Mint','Very Fine','Fine','Very Good','Good','Fair','Poor','CGC/CBCS graded']);
+const now=Date.now();
+const added=rows.filter(r=>r.some(v=>String(v??'').trim())).map((r,i)=>{const c=Object.create(null);headers.forEach((h,j)=>{if(h)c[h]=r[j]??''});const series=txt(c.series,300).trim(),issue=txt(c.issue,100).trim();if(!series||!issue)throw new Error('CSV row '+(i+2)+' is missing its series or issue number.');const year=c.year===''?'':num(c.year,0,2100);return {id:'c_'+now.toString(36)+'_'+i.toString(36)+'_'+Math.random().toString(36).slice(2,8),series,issue,variant:txt(c.variant,300),publisher:txt(c.publisher,200),year,barcode:txt(c.barcode,40).replace(/[^0-9]/g,''),condition:conditions.has(c.condition)?c.condition:'',grade:txt(c.grade,100),paid:num(c.paid),value:num(c.value),box:txt(c.box,200),status:statuses.has(c.status)?c.status:'Owned',coverUrl:txt(c.coverurl,2000),notes:txt(c.notes,5000),created:now,updated:now}});
+if(!confirm(`Import ${added.length} validated rows and add them to the current collection?`))return;
+state.comics.push(...added);save();$('dataStatus').textContent=`Imported ${added.length} validated rows.`;
+}catch(err){alert('Could not import CSV: '+err.message)}e.target.value=''});
 $('clearAll').addEventListener('click',()=>{if(confirm('This permanently deletes all Comic Vault records from this browser. Download a backup first. Continue?')&&confirm('Are you absolutely sure?')){state={comics:[],seriesGoals:{}};save();$('dataStatus').textContent='Local collection cleared.'}});
 load();
 </script>
