@@ -54,7 +54,7 @@ footer{max-width:1100px;margin:auto;padding:0 16px 24px;color:var(--muted);font-
     <div class="panel" style="margin-top:14px"><h2>Quick start</h2>
       <p>Add comics one at a time, or import a CSV you already have. On a phone, use <b>Add / Scan</b> to scan a barcode, then verify the details before saving.</p>
       <div class="warning">Your collection is saved in this browser on this device. Export a backup regularly. Clearing browser data or using another browser/device will not carry your collection over automatically.</div>
-      <div class="actions"><button class="primary" onclick="showView('add')">Add your first comic</button><button onclick="showView('backup')">Make a backup</button></div>
+      <div class="actions"><button class="primary" id="quickAddComic">Add your first comic</button><button id="quickMakeBackup">Make a backup</button></div>
     </div>
     <div class="panel" style="margin-top:14px"><h2>Recently added</h2><div id="recentList" class="note">No comics yet.</div></div>
   </section>
@@ -62,8 +62,8 @@ footer{max-width:1100px;margin:auto;padding:0 16px 24px;color:var(--muted);font-
   <section id="view-inventory" class="view hidden">
     <div class="panel">
       <h2>Inventory</h2>
-      <div class="searchrow"><input id="inventorySearch" placeholder="Search title, series, issue, barcode, box…" aria-label="Search inventory"><button onclick="renderInventory()">Search</button></div>
-      <div class="actions"><select id="statusFilter" aria-label="Filter by status" style="max-width:220px"><option value="">All statuses</option><option>Owned</option><option>Want</option><option>For Sale</option><option>Loaned</option></select><button onclick="renderInventory()">Apply filter</button></div>
+      <div class="searchrow"><input id="inventorySearch" placeholder="Search title, series, issue, barcode, box…" aria-label="Search inventory"><button data-action="refresh-inventory">Search</button></div>
+      <div class="actions"><select id="statusFilter" aria-label="Filter by status" style="max-width:220px"><option value="">All statuses</option><option>Owned</option><option>Want</option><option>For Sale</option><option>Loaned</option></select><button data-action="refresh-inventory">Apply filter</button></div>
       <div id="inventorySummary" class="note" style="margin:12px 0"></div>
       <div class="tablewrap"><table><thead><tr><th>Comic</th><th>Publisher / Year</th><th>Condition</th><th>Paid</th><th>Value</th><th>Box</th><th>Status</th><th>Actions</th></tr></thead><tbody id="inventoryBody"></tbody></table></div>
     </div>
@@ -136,7 +136,7 @@ footer{max-width:1100px;margin:auto;padding:0 16px 24px;color:var(--muted);font-
 </main>
 <footer>Comic Vault is a personal catalog tool, not a valuation service. Always verify issue, printing, and variant details. Keep regular backups.</footer>
 
-<script src="https://unpkg.com/@zxing/browser@latest"></script>
+<script src="https://unpkg.com/@zxing/browser@0.2.1"></script>
 <script>
 const STORAGE_KEY='comicVault.personal.v1';
 let state={comics:[],seriesGoals:{}};
@@ -162,11 +162,15 @@ function renderInventory(){
 const q=$('inventorySearch').value.trim().toLowerCase(),status=$('statusFilter').value;
 const list=state.comics.filter(c=>(!status||c.status===status)&&(!q||[c.series,c.issue,c.variant,c.publisher,c.barcode,c.box,c.notes,c.year].join(' ').toLowerCase().includes(q)));
 $('inventorySummary').textContent=`Showing ${list.length} of ${state.comics.length} records.`;
-$('inventoryBody').innerHTML=list.map(c=>`<tr><td><b>${esc(c.series)}</b> #${esc(c.issue)}${c.variant?'<br><span class="pill">'+esc(c.variant)+'</span>':''}${c.barcode?'<br><span class="note">UPC '+esc(c.barcode)+'</span>':''}</td><td>${esc(c.publisher||'—')}<br>${esc(c.year||'')}</td><td>${esc(c.condition||'—')}${c.grade?'<br>'+esc(c.grade):''}</td><td>${money(c.paid)}</td><td>${money(c.value)}</td><td>${esc(c.box||'—')}</td><td>${esc(c.status||'Owned')}</td><td><button onclick="editComic('${c.id}')">Edit</button> <button class="danger" onclick="deleteComic('${c.id}')">Delete</button></td></tr>`).join('')||'<tr><td colspan="8" class="note">No matching comics.</td></tr>';
+$('inventoryBody').innerHTML=list.map(c=>`<tr><td><b>${esc(c.series)}</b> #${esc(c.issue)}${c.variant?'<br><span class="pill">'+esc(c.variant)+'</span>':''}${c.barcode?'<br><span class="note">UPC '+esc(c.barcode)+'</span>':''}</td><td>${esc(c.publisher||'—')}<br>${esc(c.year||'')}</td><td>${esc(c.condition||'—')}${c.grade?'<br>'+esc(c.grade):''}</td><td>${money(c.paid)}</td><td>${money(c.value)}</td><td>${esc(c.box||'—')}</td><td>${esc(c.status||'Owned')}</td><td><button data-action="edit" data-id="${esc(c.id)}">Edit</button> <button class="danger" data-action="delete" data-id="${esc(c.id)}">Delete</button></td></tr>`).join('')||'<tr><td colspan="8" class="note">No matching comics.</td></tr>';
 }
 function getForm(){return {series:$('seriesName').value.trim(),issue:$('issue').value.trim(),variant:$('variant').value.trim(),publisher:$('publisher').value.trim(),year:$('year').value,barcode:$('formBarcode').value.trim(),condition:$('condition').value,grade:$('grade').value.trim(),paid:Number($('paid').value)||0,value:Number($('value').value)||0,box:$('box').value.trim(),status:$('status').value,coverUrl:$('coverUrl').value.trim(),notes:$('notes').value.trim()}}
 function fillForm(c){$('editId').value=c?.id||'';$('seriesName').value=c?.series||'';$('issue').value=c?.issue||'';$('variant').value=c?.variant||'';$('publisher').value=c?.publisher||'';$('year').value=c?.year||'';$('formBarcode').value=c?.barcode||'';$('condition').value=c?.condition||'';$('grade').value=c?.grade||'';$('paid').value=c?.paid??'';$('value').value=c?.value??'';$('box').value=c?.box||'';$('status').value=c?.status||'Owned';$('coverUrl').value=c?.coverUrl||'';$('notes').value=c?.notes||'';$('formTitle').textContent=c?'Edit comic':'Comic details';showView('add')}
 function editComic(id){const c=state.comics.find(x=>x.id===id);if(c)fillForm(c)}
+$('quickAddComic').addEventListener('click',()=>showView('add'));
+$('quickMakeBackup').addEventListener('click',()=>showView('backup'));
+document.querySelectorAll('[data-action="refresh-inventory"]').forEach(b=>b.addEventListener('click',renderInventory));
+$('inventoryBody').addEventListener('click',e=>{const b=e.target.closest('button[data-action][data-id]');if(!b)return;if(b.dataset.action==='edit')editComic(b.dataset.id);else if(b.dataset.action==='delete')deleteComic(b.dataset.id)});
 function deleteComic(id){const c=state.comics.find(x=>x.id===id);if(c&&confirm(`Delete ${c.series} #${c.issue}?`)){state.comics=state.comics.filter(x=>x.id!==id);save()}}
 $('comicForm').addEventListener('submit',e=>{e.preventDefault();const d=getForm();if(!d.series||!d.issue)return;const id=$('editId').value||('c_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7));const old=state.comics.find(c=>c.id===id);const c={...d,id,created:old?.created||Date.now(),updated:Date.now()};if(old)state.comics=state.comics.map(x=>x.id===id?c:x);else state.comics.push(c);save();fillForm(null);$('dataStatus').textContent='Saved.';showView('inventory')});
 $('resetForm').addEventListener('click',()=>fillForm(null));
@@ -237,19 +241,48 @@ $('barcodeImage').addEventListener('change',async e=>{const file=e.target.files?
 function renderSeries(){
 const groups={};for(const c of state.comics){if(c.status!=='Owned')continue;const k=c.series.trim();if(!k)continue;(groups[k]??=[]).push(c)}
 const names=Object.keys(groups).sort((a,b)=>a.localeCompare(b));
-$('seriesBody').innerHTML=names.map(name=>{const issues=[...new Set(groups[name].map(c=>c.issue))];const goal=state.seriesGoals[name]||'';let pct='—';if(goal&&Number(goal)>0){const owned=new Set();issues.forEach(x=>{const n=Number(x);if(Number.isFinite(n))owned.add(n)});pct=Math.min(100,Math.round(owned.size/Number(goal)*100))+'%'}return `<tr><td><b>${esc(name)}</b></td><td>${issues.map(esc).join(', ')}</td><td>${goal?esc(goal)+' issues':'Not set'}</td><td>${pct}</td><td><button onclick="setGoal(${JSON.stringify(name).replace(/"/g,'&quot;')})">Set goal</button></td></tr>`}).join('')||'<tr><td colspan="5" class="note">Add owned comics to start tracking series.</td></tr>';
+$('seriesBody').innerHTML=names.map(name=>{const issues=[...new Set(groups[name].map(c=>c.issue))];const goal=state.seriesGoals[name]||'';let pct='—';if(goal&&Number(goal)>0){const owned=new Set();issues.forEach(x=>{const n=Number(x);if(Number.isFinite(n))owned.add(n)});pct=Math.min(100,Math.round(owned.size/Number(goal)*100))+'%'}return `<tr><td><b>${esc(name)}</b></td><td>${issues.map(esc).join(', ')}</td><td>${goal?esc(goal)+' issues':'Not set'}</td><td>${pct}</td><td><button data-action="goal" data-series="${esc(name)}">Set goal</button></td></tr>`}).join('')||'<tr><td colspan="5" class="note">Add owned comics to start tracking series.</td></tr>';
 }
 function setGoal(name){const current=state.seriesGoals[name]||'';const val=prompt(`How many numbered issues are in "${name}"? Enter the total issue count for a rough completion estimate.`,current);if(val===null)return;if(val.trim()===''||!Number.isFinite(Number(val))||Number(val)<=0){delete state.seriesGoals[name]}else state.seriesGoals[name]=Number(val);save()}
+$('seriesBody').addEventListener('click',e=>{const b=e.target.closest('button[data-action="goal"][data-series]');if(b)setGoal(b.dataset.series)});
 function download(name,content,type){const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url)}
 $('exportJson').addEventListener('click',()=>{download('comic-vault-backup-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify({...state,exportedAt:new Date().toISOString(),formatVersion:1},null,2),'application/json');$('dataStatus').textContent='Full backup downloaded.'});
 const csvFields=['series','issue','variant','publisher','year','barcode','condition','grade','paid','value','box','status','coverUrl','notes'];
 function csvCell(v){const s=String(v??'');return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
 $('exportCsv').addEventListener('click',()=>{const rows=[csvFields.join(',')];state.comics.forEach(c=>rows.push(csvFields.map(k=>csvCell(c[k])).join(',')));download('comic-vault-inventory.csv',rows.join('\r\n'),'text/csv;charset=utf-8');$('dataStatus').textContent='CSV exported.'});
 $('importJson').addEventListener('click',()=>$('jsonFile').click());
-$('jsonFile').addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{const x=JSON.parse(await f.text());if(!Array.isArray(x.comics))throw new Error('Backup does not contain a comics list.');if(!confirm(`Restore ${x.comics.length} comics? This replaces the current local collection.`))return;state={comics:x.comics,seriesGoals:x.seriesGoals||{}};save();$('dataStatus').textContent='Backup restored.'}catch(err){alert('Could not restore backup: '+err.message)}e.target.value=''});
+$('jsonFile').addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{
+if(f.size>10*1024*1024)throw new Error('Backup is larger than the 10 MB safety limit.');
+const x=JSON.parse(await f.text());
+if(!x||!Array.isArray(x.comics))throw new Error('Backup does not contain a comics list.');
+if(x.comics.length>20000)throw new Error('Backup contains too many records (maximum 20,000).');
+const txt=(v,max=2000)=>String(v??'').slice(0,max);
+const num=(v,min=0,max=100000000)=>{if(v===''||v===null||v===undefined)return 0;const n=Number(v);if(!Number.isFinite(n)||n<min||n>max)throw new Error('Backup contains an invalid numeric value.');return n};
+const statuses=new Set(['Owned','Want','For Sale','Loaned']);
+const conditions=new Set(['','Mint','Near Mint','Very Fine','Fine','Very Good','Good','Fair','Poor','CGC/CBCS graded']);
+const now=Date.now();
+const comics=x.comics.map((raw,i)=>{if(!raw||typeof raw!=='object'||Array.isArray(raw))throw new Error('Comic record '+(i+1)+' is not a valid object.');const series=txt(raw.series,300).trim(),issue=txt(raw.issue,100).trim();if(!series||!issue)throw new Error('Comic record '+(i+1)+' is missing its series or issue number.');const year=raw.year===''||raw.year===null||raw.year===undefined?'':num(raw.year,0,2100);return {id:'c_'+now.toString(36)+'_'+i.toString(36)+'_'+Math.random().toString(36).slice(2,8),series,issue,variant:txt(raw.variant,300),publisher:txt(raw.publisher,200),year,barcode:txt(raw.barcode,40).replace(/[^0-9]/g,''),condition:conditions.has(raw.condition)?raw.condition:'',grade:txt(raw.grade,100),paid:num(raw.paid),value:num(raw.value),box:txt(raw.box,200),status:statuses.has(raw.status)?raw.status:'Owned',coverUrl:txt(raw.coverUrl,2000),notes:txt(raw.notes,5000),created:num(raw.created,0,Number.MAX_SAFE_INTEGER)||now,updated:num(raw.updated,0,Number.MAX_SAFE_INTEGER)||now}});
+if(x.seriesGoals!==undefined&&(!x.seriesGoals||typeof x.seriesGoals!=='object'||Array.isArray(x.seriesGoals)))throw new Error('Backup series goals are invalid.');
+const goals={};for(const [name,value] of Object.entries(x.seriesGoals||{}).slice(0,5000)){const key=txt(name,300).trim(),n=Number(value);if(key&&Number.isFinite(n)&&n>0&&n<=100000)goals[key]=n}
+if(!confirm(`Restore ${comics.length} validated comics? This replaces the current local collection.`))return;
+state={comics,seriesGoals:goals};save();$('dataStatus').textContent='Backup restored after validation.';
+}catch(err){alert('Could not restore backup: '+err.message)}e.target.value=''});
 $('importCsv').addEventListener('click',()=>$('csvFile').click());
 function parseCSV(text){const rows=[];let row=[],cell='',quoted=false;for(let i=0;i<text.length;i++){const ch=text[i];if(quoted){if(ch==='"'&&text[i+1]==='"'){cell+='"';i++}else if(ch==='"')quoted=false;else cell+=ch}else{if(ch==='"')quoted=true;else if(ch===','){row.push(cell);cell=''}else if(ch==='\n'){row.push(cell.replace(/\r$/,''));rows.push(row);row=[];cell=''}else cell+=ch}}if(cell.length||row.length){row.push(cell.replace(/\r$/,''));rows.push(row)}return rows}
-$('csvFile').addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{const rows=parseCSV(await f.text());if(rows.length<2)throw new Error('CSV has no data rows.');const headers=rows.shift().map(x=>x.trim());const added=rows.filter(r=>r.some(v=>v.trim())).map(r=>{const c={};headers.forEach((h,i)=>c[h]=r[i]??'');return {id:'c_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),series:c.series||c.Series||'',issue:c.issue||c.Issue||'',variant:c.variant||'',publisher:c.publisher||'',year:c.year||'',barcode:c.barcode||'',condition:c.condition||'',grade:c.grade||'',paid:Number(c.paid)||0,value:Number(c.value)||0,box:c.box||'',status:c.status||'Owned',coverUrl:c.coverUrl||'',notes:c.notes||'',created:Date.now(),updated:Date.now()}});if(!confirm(`Import ${added.length} rows and add them to the current collection?`))return;state.comics.push(...added);save();$('dataStatus').textContent=`Imported ${added.length} rows.`}catch(err){alert('Could not import CSV: '+err.message)}e.target.value=''});
+$('csvFile').addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{
+if(f.size>10*1024*1024)throw new Error('CSV is larger than the 10 MB safety limit.');
+const rows=parseCSV(await f.text());if(rows.length<2)throw new Error('CSV has no data rows.');
+if(rows.length>20001)throw new Error('CSV contains too many rows (maximum 20,000 comics).');
+const headers=rows.shift().map(x=>x.trim().toLowerCase());
+const txt=(v,max=2000)=>String(v??'').slice(0,max);
+const num=(v,min=0,max=100000000)=>{if(v===''||v===null||v===undefined)return 0;const n=Number(v);if(!Number.isFinite(n)||n<min||n>max)throw new Error('CSV contains an invalid numeric value.');return n};
+const statuses=new Set(['Owned','Want','For Sale','Loaned']);
+const conditions=new Set(['','Mint','Near Mint','Very Fine','Fine','Very Good','Good','Fair','Poor','CGC/CBCS graded']);
+const now=Date.now();
+const added=rows.filter(r=>r.some(v=>String(v??'').trim())).map((r,i)=>{const c=Object.create(null);headers.forEach((h,j)=>{if(h)c[h]=r[j]??''});const series=txt(c.series,300).trim(),issue=txt(c.issue,100).trim();if(!series||!issue)throw new Error('CSV row '+(i+2)+' is missing its series or issue number.');const year=c.year===''?'':num(c.year,0,2100);return {id:'c_'+now.toString(36)+'_'+i.toString(36)+'_'+Math.random().toString(36).slice(2,8),series,issue,variant:txt(c.variant,300),publisher:txt(c.publisher,200),year,barcode:txt(c.barcode,40).replace(/[^0-9]/g,''),condition:conditions.has(c.condition)?c.condition:'',grade:txt(c.grade,100),paid:num(c.paid),value:num(c.value),box:txt(c.box,200),status:statuses.has(c.status)?c.status:'Owned',coverUrl:txt(c.coverurl,2000),notes:txt(c.notes,5000),created:now,updated:now}});
+if(!confirm(`Import ${added.length} validated rows and add them to the current collection?`))return;
+state.comics.push(...added);save();$('dataStatus').textContent=`Imported ${added.length} validated rows.`;
+}catch(err){alert('Could not import CSV: '+err.message)}e.target.value=''});
 $('clearAll').addEventListener('click',()=>{if(confirm('This permanently deletes all Comic Vault records from this browser. Download a backup first. Continue?')&&confirm('Are you absolutely sure?')){state={comics:[],seriesGoals:{}};save();$('dataStatus').textContent='Local collection cleared.'}});
 load();
 </script>

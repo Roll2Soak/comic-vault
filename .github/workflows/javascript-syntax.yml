@@ -1,0 +1,68 @@
+name: JavaScript syntax and app smoke tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [security/fix-import-rendering]
+
+permissions:
+  contents: read
+
+jobs:
+  check-inline-javascript:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Extract app JavaScript and check syntax
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          class ScriptExtractor(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.inline = False
+                  self.current = []
+                  self.scripts = []
+              def handle_starttag(self, tag, attrs):
+                  if tag.lower() == "script":
+                      self.inline = not any(k.lower() == "src" for k, _ in attrs)
+                      self.current = []
+              def handle_data(self, data):
+                  if self.inline:
+                      self.current.append(data)
+              def handle_endtag(self, tag):
+                  if tag.lower() == "script":
+                      if self.inline:
+                          self.scripts.append("".join(self.current))
+                      self.inline = False
+                      self.current = []
+          parser = ScriptExtractor()
+          parser.feed(Path("index.html").read_text(encoding="utf-8"))
+          if not parser.scripts or not any(s.strip() for s in parser.scripts):
+              raise SystemExit("ERROR: no inline application JavaScript found")
+          Path("/tmp/comic-vault-inline.js").write_text("\n".join(s for s in parser.scripts if s.strip()), encoding="utf-8")
+          print("Extracted inline application JavaScript.")
+          PY
+          node --check /tmp/comic-vault-inline.js
+
+  browser-smoke-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Playwright
+        run: npm install --no-save playwright
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Start local test server
+        run: python3 -m http.server 8000 --bind 127.0.0.1 > /tmp/comic-vault-server.log 2>&1 &
+      - name: Run isolated browser smoke tests
+        run: node tests/smoke.js
