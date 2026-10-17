@@ -50,6 +50,7 @@ const base = 'http://127.0.0.1:8000';
       buffer: Buffer.from(JSON.stringify({comics:[{id:'attacker-controlled-id',series:'Imported Test',issue:'7',status:'Owned',paid:1,value:3}],seriesGoals:{'Imported Test':10}}))
     });
     check((await page.locator('#inventoryBody').innerText()).includes('Imported Test') === false, 'Unexpected view after JSON restore');
+    await page.waitForFunction(() => { const s = JSON.parse(localStorage.getItem('comicVault.personal.v1')); return s?.comics?.length === 1 && s.comics[0]?.series === 'Imported Test'; });
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('comicVault.personal.v1')));
     check(stored.comics.length === 1 && stored.comics[0].series === 'Imported Test', 'Valid JSON restore failed');
     check(stored.comics[0].id !== 'attacker-controlled-id', 'Imported comic ID was not regenerated');
@@ -59,6 +60,7 @@ const base = 'http://127.0.0.1:8000';
       name: 'invalid-test.json', mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify({comics:[{series:'',issue:'1'}]}))
     });
+    await page.waitForFunction(() => { const s = JSON.parse(localStorage.getItem('comicVault.personal.v1')); return s?.comics?.length === 1 && s.comics[0]?.series === 'Imported Test'; });
     const afterInvalid = await page.evaluate(() => JSON.parse(localStorage.getItem('comicVault.personal.v1')));
     check(afterInvalid.comics.length === 1 && afterInvalid.comics[0].series === 'Imported Test', 'Invalid JSON replaced the existing collection');
 
@@ -67,6 +69,7 @@ const base = 'http://127.0.0.1:8000';
       name: 'test.csv', mimeType: 'text/csv',
       buffer: Buffer.from('series,issue,publisher,paid,value,status\nCSV Test,3,Test Publisher,4,8,Owned\n')
     });
+    await page.waitForFunction(() => { const s = JSON.parse(localStorage.getItem('comicVault.personal.v1')); return s?.comics?.length === 2 && s.comics.some(c => c.series === 'CSV Test' && c.issue === '3'); });
     const afterCsv = await page.evaluate(() => JSON.parse(localStorage.getItem('comicVault.personal.v1')));
     check(afterCsv.comics.length === 2 && afterCsv.comics.some(c => c.series === 'CSV Test' && c.issue === '3'), 'CSV import failed');
 
