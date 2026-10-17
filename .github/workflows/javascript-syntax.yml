@@ -44,7 +44,7 @@ jobs:
           parser.feed(Path("index.html").read_text(encoding="utf-8"))
           if not parser.scripts or not any(s.strip() for s in parser.scripts):
               raise SystemExit("ERROR: no inline application JavaScript found")
-          Path("/tmp/comic-vault-inline.js").write_text("\\n".join(s for s in parser.scripts if s.strip()), encoding="utf-8")
+          Path("/tmp/comic-vault-inline.js").write_text("\n".join(s for s in parser.scripts if s.strip()), encoding="utf-8")
           print("Extracted inline application JavaScript.")
           PY
           node --check /tmp/comic-vault-inline.js
